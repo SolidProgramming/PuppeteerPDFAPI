@@ -1,0 +1,11 @@
+@PuppeteerPDFAPI_HostAddress = http://localhost:5252
+
+GET {{PuppeteerPDFAPI_HostAddress}}/todos/
+Accept: application/json
+
+###
+
+GET {{PuppeteerPDFAPI_HostAddress}}/todos/1
+Accept: application/json
+
+###
