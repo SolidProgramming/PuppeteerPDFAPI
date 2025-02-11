@@ -1,39 +1,45 @@
 ﻿using HtmlAgilityPack;
-using PuppeteerPDFAPI.Models;
+using PuppeteerSharp;
+using System.IO;
+using System.Text;
 
 namespace PuppeteerPDFAPI.Services
 {
     public interface IFileService
     {
-        Task<(bool Success, string? ErrorMessage)> UploadAsync(FileModel file);
-        bool IsValidHtml();
+        Task<(FileModel?, string? ErrorMessage)> ProcessAsync(IFormFile file);
     }
 
     public class FileService(ILogger<FileService> logger) : IFileService
     {
-        public bool IsValidHtml()
+        public async Task<(FileModel?, string? ErrorMessage)> ProcessAsync(IFormFile formFile)
         {
-            throw new NotImplementedException();
-        }
+            string? extension = Path.GetExtension(formFile.FileName);
 
-        public async Task<(bool Success, string? ErrorMessage)> UploadAsync(FileModel file)
-        {
-            return await Task.Run<(bool, string?)>(() =>
+            if (extension == null)
+                return (default, "No file extension found!");
+
+            if (!extension.Equals(".html"))
+                return (default, "File has to be of type HTML!");
+
+            using StreamReader sr = new(formFile.OpenReadStream(), Encoding.UTF8);
+
+            string content = await sr.ReadToEndAsync();
+
+            if (!IsValidHtml(content))
+                return (default, "Invalid HTML!");
+
+            FileModel file = new()
             {
-                try
-                {
-                    using Stream stream = new FileStream(file.Guid + file.FileExtension, FileMode.Create);
-                    file.File.CopyTo(stream);
-                    return (true, default);
-                }
-                catch (Exception ex)
-                {
-                    return (false, ex.ToString());
-                }
-            });
+                Guid = Guid.NewGuid().ToString(),
+                FileExtension = extension,
+                Content = content,
+            };
+
+            return (file, default);
         }
 
-        private static bool IsValidHTML(string html)
+        private bool IsValidHtml(string html)
         {
             try
             {
@@ -41,12 +47,11 @@ namespace PuppeteerPDFAPI.Services
                 doc.LoadHtml(html);
                 return !doc.ParseErrors.Any();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                logger.LogError($"{DateTime.Now} [{nameof(FileService)}] | {ex}");
                 return false;
             }
-
         }
-
     }
 }

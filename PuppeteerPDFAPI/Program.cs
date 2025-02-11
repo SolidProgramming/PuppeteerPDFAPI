@@ -1,7 +1,6 @@
 global using PuppeteerPDFAPI.Models;
 using PuppeteerPDFAPI.Services;
 
-
 WebApplicationBuilder builder = WebApplication.CreateSlimBuilder(args);
 
 builder.Services.AddSingleton<IFileService, FileService>();
@@ -14,25 +13,30 @@ builder.WebHost.UseKestrel(_ =>
 
 WebApplication app = builder.Build();
 
-app.MapPost("pdf", async (IFileService fileService, HttpRequest request) =>
+app.MapPost("pdf", async (IFileService fileService, IPuppeteerService puppeteerService, HttpRequest request) =>
 {
     if (!request.Form.Files.Any())
         return Results.BadRequest("No uploaded files!");
 
     if (request.Form.Files.Count > 1)
-        return Results.Problem("Too many files uploaded. Upload limit = 1");
+        return Results.BadRequest("Too many files uploaded. Upload limit = 1");
 
-    FileModel file = new()
-    {
-        Guid = Guid.NewGuid().ToString(),
-        FileExtension = request.Form.Files[0].FileName,
-        File = request.Form.Files[0]
-    };
+    IFormFile file = request.Form.Files[0];
 
+    (FileModel? processedFile, string? ErrorMessage) = await fileService.ProcessAsync(file);
 
-    await fileService.UploadAsync(file);
+    if (processedFile is null)
+        return Results.BadRequest(ErrorMessage);
 
-    return Results.Ok();
+    if (string.IsNullOrEmpty(processedFile.Content))
+        return Results.BadRequest("Empty file!");
+
+    (Stream? pdfStream, ErrorMessage) = await puppeteerService.ConvertAsync(processedFile.Content);
+
+    if (pdfStream is null)
+        return Results.Problem(ErrorMessage);
+
+    return Results.File(pdfStream, contentType: "application/pdf");
 });
 
 IPuppeteerService puppeteerService = app.Services.GetRequiredService<IPuppeteerService>();

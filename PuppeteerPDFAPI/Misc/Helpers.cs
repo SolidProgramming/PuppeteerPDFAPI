@@ -27,7 +27,7 @@ namespace PuppeteerPDFAPI.Misc
             if (!Directory.Exists(path))
                 Directory.CreateDirectory(path);
 
-            if (browserName.ToLower() == "chromium")
+            if (browserName.Equals("chromium", StringComparison.CurrentCultureIgnoreCase))
                 browserName = "chrome";
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
